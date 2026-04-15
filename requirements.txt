@@ -1,0 +1,10 @@
+pandas
+jupyter
+matplotlib
+seaborn
+requests
+pyarrow
+fastparquet
+google-cloud-storage
+google-cloud-bigquery
+db-dtypes
