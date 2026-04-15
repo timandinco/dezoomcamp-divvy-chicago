@@ -1,0 +1,22 @@
+id: ingest-divvy-data
+namespace: divvy.bikes
+
+tasks:
+  - id: download_data
+    type: io.kestra.plugin.scripts.python.Script
+    script: |
+      import requests
+      import gcsfs
+      
+      # Download one month of data
+      url = "https://divvy-tripdata.s3.amazonaws.com/202310-divvy-tripdata.zip"
+      
+      # Download and upload to GCS
+      # (Add your logic here)
+      
+  - id: load_to_bigquery
+    type: io.kestra.plugin.gcp.bigquery.Load
+    from: "gs://divvy-bike-data-lake/raw/202310-divvy-tripdata.csv"
+    destinationTable: "your-project.divvy_bikes.raw_trips"
+    format: CSV
+    autodetect: true

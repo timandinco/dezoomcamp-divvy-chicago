@@ -1,0 +1,30 @@
+[0m15:59:16.810836 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76bab1fb72b0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76bab0d68310>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76bab0d682b0>]}
+
+
+============================== 15:59:16.815270 | d30934b5-4dd1-4270-9ec4-5f729956dc2c ==============================
+[0m15:59:16.815270 [info ] [MainThread]: Running with dbt=1.11.4
+[0m15:59:16.815875 [debug] [MainThread]: running dbt with arguments {'write_json': 'True', 'printer_width': '80', 'send_anonymous_usage_stats': 'True', 'log_path': 'logs', 'empty': 'None', 'warn_error': 'None', 'version_check': 'True', 'static_parser': 'True', 'log_cache_events': 'False', 'use_experimental_parser': 'False', 'use_colors': 'True', 'profiles_dir': '/home/zonate/.dbt', 'quiet': 'False', 'no_print': 'None', 'invocation_command': 'dbt init divvy_analytics', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'introspect': 'True', 'cache_selected_only': 'False', 'fail_fast': 'False', 'log_format': 'default', 'partial_parse': 'True', 'target_path': 'None', 'debug': 'False', 'indirect_selection': 'eager'}
+[0m15:59:16.833154 [debug] [MainThread]: Starter project path: /home/zonate/.local/lib/python3.10/site-packages/dbt/include/starter_project
+[0m15:59:16.840368 [info ] [MainThread]: 
+Your new dbt project "divvy_analytics" was created!
+
+For more information on how to configure the profiles.yml file,
+please consult the dbt documentation here:
+
+  https://docs.getdbt.com/docs/configure-your-profile
+
+One more thing:
+
+Need help? Don't hesitate to reach out to us via GitHub issues or on Slack:
+
+  https://community.getdbt.com/
+
+Happy modeling!
+
+[0m15:59:16.840909 [info ] [MainThread]: Setting up your profile.
+[0m16:02:11.485601 [info ] [MainThread]: Profile divvy_analytics written to /home/zonate/.dbt/profiles.yml using target's profile_template.yml and your supplied values. Run 'dbt debug' to validate the connection.
+[0m16:02:11.490082 [debug] [MainThread]: Resource report: {"command_name": "init", "command_success": true, "command_wall_clock_time": 170.02188, "process_in_blocks": "368912", "process_kernel_time": 0.611821, "process_mem_max_rss": "340240", "process_out_blocks": "80", "process_user_time": 4.294903}
+[0m16:02:11.491748 [debug] [MainThread]: Command `dbt init` succeeded at 16:02:11.491620 after 170.02 seconds
+[0m16:02:11.492832 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76bab1fb72b0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76ba72a340d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76ba72a34d90>]}
+[0m16:02:11.493330 [debug] [MainThread]: Flushing usage events
+[0m16:02:11.841658 [debug] [MainThread]: An error was encountered while trying to flush usage events
