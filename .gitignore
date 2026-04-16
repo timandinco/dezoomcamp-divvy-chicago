@@ -43,3 +43,4 @@ data/*.zip
 
 notebooks/data/*
 
+gcp-credentials/*.json
