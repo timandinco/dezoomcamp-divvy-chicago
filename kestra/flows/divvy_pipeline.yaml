@@ -1,4 +1,4 @@
-id: ingest-divvy-data
+id: divvy-data-pipeline
 namespace: divvy.bikes
 
 tasks:
