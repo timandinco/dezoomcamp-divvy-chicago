@@ -3,7 +3,14 @@
   "dockerComposeFile": "../docker-compose.yml",
   "service": "kestra",
   "workspaceFolder": "/workspace",
-  
+
+  "features": {
+    "ghcr.io/devcontainers/features/python": {
+      "version": "latest"
+    }
+  },
+
+
   "customizations": {
     "vscode": {
       "extensions": [
