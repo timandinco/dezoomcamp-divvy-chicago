@@ -45,7 +45,7 @@ services:
           storage:
             type: local
             local:
-              base-path: "/kestra/storage"
+              base-path: "/app/storage"
           flows:
             paths:
               - "/kestra/flows"
