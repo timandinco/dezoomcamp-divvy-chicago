@@ -45,7 +45,10 @@ services:
           storage:
             type: local
             local:
-              base-path: "/app/storage"
+              base-path: "/kestra/storage"
+          flows:
+            paths:
+              - "/kestra/flows"
           queue:
             type: postgres
           tasks:

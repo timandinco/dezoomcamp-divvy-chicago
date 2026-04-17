@@ -1,0 +1,50 @@
+id: divvy-data-ingestion
+namespace: divvy.bikes
+
+inputs:
+  - id: year_month
+    type: STRING
+    defaults: "202310"
+    description: "Year-month to download (e.g., 202310 for Oct 2023)"
+
+tasks:
+  - id: download_from_s3
+    type: io.kestra.plugin.fs.http.Download
+    uri: "https://divvy-tripdata.s3.amazonaws.com/{{ inputs.year_month }}-divvy-tripdata.zip"
+    description: "Download Divvy data from S3"
+
+  - id: unzip_file
+    type: io.kestra.plugin.compress.ArchiveDecompress
+    algorithm: ZIP
+    from: "{{ outputs.download_from_s3.uri }}"
+    description: "Extract CSV from ZIP"
+
+  - id: upload_to_gcs
+    type: io.kestra.plugin.gcp.gcs.Upload
+    from: "{{ outputs.unzip_file.files[outputs.year_month ~ '-divvy-tripdata.csv'] }}"
+    to: "gs://YOUR-BUCKET-NAME/raw/{{ inputs.year_month }}/{{ inputs.year_month }}-divvy-tripdata.csv"
+    serviceAccount: "{{ secret('GCP_SERVICE_ACCOUNT') }}"
+    projectId: "YOUR-GCP-PROJECT-ID"
+    description: "Upload to GCS data lake"
+
+  - id: load_to_bigquery
+    type: io.kestra.plugin.gcp.bigquery.Load
+    from: "{{ outputs.unzip_file.files[outputs.year_month ~ '-divvy-tripdata.csv'] }}"
+    destinationTable: "YOUR-PROJECT-ID.divvy_bikes.raw_trips"
+    format: CSV
+    csvOptions:
+      fieldDelimiter: ","
+      skipLeadingRows: 1
+    autodetect: true
+    writeDisposition: WRITE_APPEND
+    timePartitioningField: started_at
+    serviceAccount: "{{ secret('GCP_SERVICE_ACCOUNT') }}"
+    projectId: "YOUR-GCP-PROJECT-ID"
+    description: "Load to BigQuery"
+
+  - id: cleanup
+    type: io.kestra.plugin.scripts.shell.Commands
+    commands:
+      - rm -f {{ outputs.download_from_s3.uri }}
+      - rm -f {{ outputs.unzip_file.files[outputs.year_month ~ '-divvy-tripdata.csv'] }}
+    description: "Clean up temporary files"
