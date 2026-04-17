@@ -2,8 +2,7 @@
   "name": "Divvy Data Engineering",
   "dockerComposeFile": "../docker-compose.yml",
   "service": "kestra",
-  "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
 
   "features": {
     "ghcr.io/devcontainers/features/python": {
