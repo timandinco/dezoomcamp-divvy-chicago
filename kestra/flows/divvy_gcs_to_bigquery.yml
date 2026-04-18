@@ -1,0 +1,64 @@
+id: divvy_gcs_to_bigquery
+namespace: divvy.load
+
+description: |
+  Loads the latest Divvy CSV from GCS into a raw BigQuery table using an
+  external-data load job. Runs after divvy_ingest_to_gcs completes.
+
+labels:
+  project: divvy-elt
+  layer: load
+  source: gcs
+  destination: bigquery
+
+inputs:
+  - id: year
+    type: STRING
+    defaults: "{{ now() | dateAdd(-1, 'MONTHS') | date('yyyy') }}"
+
+  - id: month
+    type: STRING
+    defaults: "{{ now() | dateAdd(-1, 'MONTHS') | date('MM') }}"
+
+variables:
+  file_stem: "{{ inputs.year }}{{ inputs.month }}-divvy-tripdata"
+  gcs_uri: "gs://{{ envs.GCP_BUCKET }}/raw/divvy/{{ inputs.year }}/{{ inputs.month }}/{{ vars.file_stem }}.csv"
+  bq_table: "{{ envs.BQ_DATASET }}.trips_{{ inputs.year }}_{{ inputs.month }}"
+
+tasks:
+
+  - id: load_to_bigquery
+    type: io.kestra.plugin.gcp.bigquery.Load
+    serviceAccount: "{{ secret('GCP_SERVICE_ACCOUNT_JSON') }}"
+    projectId: "{{ envs.GCP_PROJECT_ID }}"
+    destinationTable: "{{ envs.GCP_PROJECT_ID }}.{{ vars.bq_table }}"
+    format: CSV
+    csvOptions:
+      fieldDelimiter: ","
+      skipLeadingRows: 1
+      allowJaggedRows: false
+      allowQuotedNewlines: true
+    autodetect: true
+    writeDisposition: WRITE_TRUNCATE
+    createDisposition: CREATE_IF_NEEDED
+    from:
+      - "{{ vars.gcs_uri }}"
+    description: "Load CSV from GCS into BigQuery partition table"
+
+  - id: log_load_result
+    type: io.kestra.plugin.core.log.Log
+    message: |
+      Loaded {{ vars.file_stem }}.csv into BigQuery
+      Table : {{ vars.bq_table }}
+      Source: {{ vars.gcs_uri }}
+
+triggers:
+  - id: after_ingest
+    type: io.kestra.plugin.core.trigger.Flow
+    conditions:
+      - type: io.kestra.plugin.core.condition.ExecutionFlowCondition
+        namespace: divvy.ingest
+        flowId: divvy_ingest_to_gcs
+      - type: io.kestra.plugin.core.condition.ExecutionStatusCondition
+        in:
+          - SUCCESS

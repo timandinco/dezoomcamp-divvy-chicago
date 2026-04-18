@@ -1,0 +1,25 @@
+# dbt 
+dbt-core>=1.8,<2.0
+dbt-bigquery>=1.8,<2.0
+
+# GCP SDKs 
+google-cloud-bigquery>=3.0
+google-cloud-storage>=2.0
+google-auth>=2.0
+
+# Data utilities 
+pandas>=2.0
+pyarrow>=14.0
+
+# Dev / linting
+sqlfluff>=3.0
+sqlfluff-templater-dbt>=3.0
+pre-commit
+
+jupyter
+matplotlib
+seaborn
+requests
+
+fastparquet
+db-dtypes

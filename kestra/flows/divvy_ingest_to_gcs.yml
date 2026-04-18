@@ -1,0 +1,69 @@
+id: divvy_ingest_to_gcs
+namespace: divvy.ingest
+
+description: |
+  Downloads a Divvy trip data ZIP from the public S3 bucket, extracts the CSV,
+  and uploads it to the configured GCS bucket under raw/divvy/.
+
+  Schedule: monthly, targeting the prior month's data file.
+  Trigger manually for backfills by passing `year` and `month` inputs.
+
+labels:
+  project: divvy-elt
+  layer: ingest
+  source: s3-public
+  destination: gcs
+
+inputs:
+  - id: year
+    type: STRING
+    description: "Four-digit year, e.g. 2024"
+    defaults: "{{ now() | dateAdd(-1, 'MONTHS') | date('yyyy') }}"
+
+  - id: month
+    type: STRING
+    description: "Zero-padded month, e.g. 01"
+    defaults: "{{ now() | dateAdd(-1, 'MONTHS') | date('MM') }}"
+
+variables:
+  file_stem: "{{ inputs.year }}{{ inputs.month }}-divvy-tripdata"
+  zip_url: "https://divvy-tripdata.s3.amazonaws.com/{{ vars.file_stem }}.zip"
+  gcs_prefix: "raw/divvy/{{ inputs.year }}/{{ inputs.month }}"
+  gcs_destination: "{{ vars.gcs_prefix }}/{{ vars.file_stem }}.csv"
+
+tasks:
+
+  - id: download_zip
+    type: io.kestra.plugin.core.http.Download
+    uri: "{{ vars.zip_url }}"
+    description: "Fetch the monthly ZIP from the Divvy S3 public bucket"
+
+  - id: extract_csv
+    type: io.kestra.plugin.compress.ArchiveDecompress
+    algorithm: ZIP
+    from: "{{ outputs.download_zip.uri }}"
+    description: "Extract CSV from the ZIP archive"
+
+  - id: upload_to_gcs
+    type: io.kestra.plugin.gcp.gcs.Upload
+    serviceAccount: "{{ secret('GCP_SERVICE_ACCOUNT_JSON') }}"
+    projectId: "{{ envs.GCP_PROJECT_ID }}"
+    bucket: "{{ envs.GCP_BUCKET }}"
+    # The extracted file — adjust the glob if the zip contains multiple files
+    from: "{{ outputs.extract_csv.files | first }}"
+    to: "{{ vars.gcs_destination }}"
+    description: "Upload extracted CSV to GCS raw zone"
+
+  - id: log_success
+    type: io.kestra.plugin.core.log.Log
+    message: |
+      Ingested {{ vars.file_stem }}.csv
+      Source : {{ vars.zip_url }}
+      GCS    : gs://{{ envs.GCP_BUCKET }}/{{ vars.gcs_destination }}
+
+triggers:
+  - id: monthly_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    # Runs on the 5th of each month to allow source data to be published
+    cron: "0 6 5 * *"
+    description: "Monthly ingest on the 5th at 06:00 UTC"

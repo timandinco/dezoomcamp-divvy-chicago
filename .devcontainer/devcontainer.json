@@ -1,23 +1,80 @@
 {
-  "name": "Divvy Data Engineering",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11",
-  
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker": "latest"
+  // ─────────────────────────────────────────────────────────────────────────
+  // GitHub Codespaces / VS Code Dev Container configuration
+  // Pipeline: Divvy Trip Data → GCS → BigQuery (Kestra + dbt)
+  // ─────────────────────────────────────────────────────────────────────────
+  "name": "Divvy ELT Pipeline",
+
+  // Use docker-compose so Kestra + Postgres start alongside the workspace
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "workspace",
+  "workspaceFolder": "/workspace",
+
+  // ── Port forwarding ───────────────────────────────────────────────────────
+  // Kestra UI will auto-open in the browser when the container is ready
+  "forwardPorts": [8080, 8081],
+  "portsAttributes": {
+    "8080": {
+      "label": "Kestra UI",
+      "onAutoForward": "openBrowser",
+      "protocol": "http"
+    },
+    "8081": {
+      "label": "Kestra Management",
+      "onAutoForward": "silent"
+    }
   },
 
+  // ── Lifecycle hooks ───────────────────────────────────────────────────────
+  // postCreateCommand  – runs once when the codespace is first created
+  // postStartCommand   – runs every time the codespace starts/restarts
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash scripts/import-flows.sh",
+
+  // ── VS Code extensions ────────────────────────────────────────────────────
   "customizations": {
     "vscode": {
       "extensions": [
+        // Python & dbt
         "ms-python.python",
-        "ms-toolsai.jupyter",
+        "ms-python.vscode-pylance",
+        "dbt-labs.dbt-power-user",
+        // Kestra flow editor (YAML with Kestra schema support)
+        "kestra-io.kestra",
+        // YAML / JSON
+        "redhat.vscode-yaml",
+        // SQL
+        "inferrinizzard.prettier-sql-vscode",
+        // Docker
         "ms-azuretools.vscode-docker",
-        "redhat.vscode-yaml"
-      ]
+        // Git
+        "eamodio.gitlens",
+        // GCP
+        "googlecloudtools.cloudcode"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "dbt.dbtPythonPathOverride": "/usr/local/bin/python",
+        "[yaml]": {
+          "editor.defaultFormatter": "redhat.vscode-yaml"
+        },
+        "yaml.schemas": {
+          // Kestra flow schema for auto-complete in flows/
+          "https://kestra.io/defs/flow.json": "kestra/flows/**/*.yml"
+        },
+        "editor.formatOnSave": true,
+        "files.trimTrailingWhitespace": true
+      }
     }
   },
-  
-  "forwardPorts": [8080, 8081, 8888],
-  
-  "postCreateCommand": "pip install -r requirements.txt"
+
+  // ── Environment variables available inside the workspace container ────────
+  // Sensitive values (GCP key JSON, project IDs) should be set as
+  // Codespace Secrets at: github.com → Settings → Codespaces → Secrets
+  "containerEnv": {
+    "KESTRA_HOST": "http://kestra:8080"
+  },
+
+  // Run as the non-root vscode user provided by the base image
+  "remoteUser": "vscode"
 }

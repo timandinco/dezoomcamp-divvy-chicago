@@ -1,64 +1,144 @@
-version: "3.8"
+name: divvy-elt-pipeline
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Services
+#   workspace      – dev container (Python, gcloud, dbt). This is the shell
+#                    you live in inside VS Code / GitHub Codespaces.
+#   kestra-db      – PostgreSQL 15 backend for Kestra metadata & queue.
+#   kestra         – Kestra standalone server (UI + worker in one process).
+#                    Flows in ./kestra/flows/ are auto-imported on startup.
+#
+# GCP credentials
+#   Option A (local):  place your service-account key at ./secrets/gcp-key.json
+#   Option B (Codespaces): add GOOGLE_APPLICATION_CREDENTIALS_JSON as a
+#             Codespace secret; the post-create script will write it to disk.
+# ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  postgres:
-    image: postgres:15
+
+  # ── Dev workspace ─────────────────────────────────────────────────────────
+  workspace:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    container_name: divvy-workspace
+    volumes:
+      - .:/workspace:cached
+      - /var/run/docker.sock:/var/run/docker.sock   # Docker-out-of-Docker
+      - workspace-venv:/workspace/.venv              # persist pip installs
+    working_dir: /workspace
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /workspace/secrets/gcp-key.json
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-my-gcp-project}
+      GCP_BUCKET: ${GCP_BUCKET:-my-divvy-bucket}
+      BQ_DATASET: ${BQ_DATASET:-divvy_raw}
+      KESTRA_HOST: http://kestra:8080
+    command: sleep infinity
+    depends_on:
+      kestra:
+        condition: service_healthy
+    networks:
+      - pipeline-net
+
+  # ── Kestra metadata database ─────────────────────────────────────────────
+  kestra-db:
+    image: postgres:15-alpine
     container_name: kestra-postgres
     environment:
       POSTGRES_DB: kestra
       POSTGRES_USER: kestra
-      POSTGRES_PASSWORD: k3str4
+      POSTGRES_PASSWORD: ${KESTRA_DB_PASSWORD:-kestra_dev_password}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - kestra-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kestra"]
+      test: ["CMD-SHELL", "pg_isready -U kestra -d kestra"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - pipeline-net
 
+  # ── Kestra orchestration server ───────────────────────────────────────────
   kestra:
-    image: kestra/kestra:latest
+    # `latest-full` image bundles all official plugins including:
+    # GCS, BigQuery, HTTP, Script (Python/Shell), dbt, and more.
+    image: kestra/kestra:latest-full
     container_name: kestra
-    pull_policy: always
-    user: "root"
-    command: server standalone
-    volumes:
-      - kestra-data:/app/storage
-      - /var/run/docker.sock:/var/run/docker.sock
-      - .:/workspace  # Mount current directory
+    command: server standalone --worker-thread=8
+
     environment:
+      # ── Inline Kestra configuration (overrides application.yml) ──────────
       KESTRA_CONFIGURATION: |
         datasources:
           postgres:
-            url: jdbc:postgresql://postgres:5432/kestra
+            url: jdbc:postgresql://kestra-db:5432/kestra
             driverClassName: org.postgresql.Driver
             username: kestra
-            password: k3str4
+            password: ${KESTRA_DB_PASSWORD:-kestra_dev_password}
         kestra:
           server:
             basic-auth:
               enabled: false
+              username: admin
+              password: admin
           repository:
             type: postgres
           storage:
             type: local
             local:
-              base-path: "/app/storage"
+              base-path: /app/kestra-storage
+            # ── Switch to GCS for shared / production storage ────────────
+            # type: gcs
+            # gcs:
+            #   bucket: ${GCP_BUCKET}
+            #   project-id: ${GCP_PROJECT_ID}
           queue:
             type: postgres
           tasks:
             tmp-dir:
               path: /tmp/kestra-wd/tmp
           url: http://localhost:8080/
+      # ── GCP credentials forwarded from the host / Codespace secret ───────
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp-key.json
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-my-gcp-project}
+      GCP_BUCKET: ${GCP_BUCKET:-my-divvy-bucket}
+      BQ_DATASET: ${BQ_DATASET:-divvy_raw}
+
+    volumes:
+      # Flows directory — add .yml files here; they are imported at startup
+      - ./kestra/flows:/kestra-flows:ro
+      # Persistent Kestra internal file storage
+      - kestra-storage:/app/kestra-storage
+      # Temp working directory for task execution
+      - kestra-tmp:/tmp/kestra-wd
+      # GCP service-account key (create ./secrets/gcp-key.json)
+      - ./secrets/gcp-key.json:/secrets/gcp-key.json:ro
+
     ports:
-      - "8080:8080"
-      - "8081:8081"
+      - "8080:8080"   # Kestra UI & REST API
+      - "8081:8081"   # Kestra management endpoint
+
     depends_on:
-      postgres:
+      kestra-db:
         condition: service_healthy
 
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/v1/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+    networks:
+      - pipeline-net
+
+# ─────────────────────────────────────────────────────────────────────────────
 volumes:
-  postgres-data:
-  kestra-data:
+  kestra-db-data:
+  kestra-storage:
+  kestra-tmp:
+  workspace-venv:
+
+networks:
+  pipeline-net:
+    driver: bridge
