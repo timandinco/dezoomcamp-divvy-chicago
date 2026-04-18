@@ -2,21 +2,32 @@ name: divvy-elt-pipeline
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Services
-#   workspace      – dev container (Python, gcloud, dbt). This is the shell
-#                    you live in inside VS Code / GitHub Codespaces.
-#   kestra-db      – PostgreSQL 15 backend for Kestra metadata & queue.
-#   kestra         – Kestra standalone server (UI + worker in one process).
-#                    Flows in ./kestra/flows/ are auto-imported on startup.
+#   workspace   - dev container (Python 3.11, gcloud, dbt). This is the shell
+#                 VS Code / GitHub Codespaces attaches to.
+#   kestra-db   - PostgreSQL 15 backend for Kestra metadata & queue.
+#   kestra      - Kestra standalone server (UI + worker in one process).
+#                 Port 8080 is forwarded to the browser automatically.
+#                 Flows in ./kestra/flows/ are imported by import-flows.sh
+#                 which runs on every Codespace start via postStartCommand.
 #
-# GCP credentials
-#   Option A (local):  place your service-account key at ./secrets/gcp-key.json
-#   Option B (Codespaces): add GOOGLE_APPLICATION_CREDENTIALS_JSON as a
-#             Codespace secret; the post-create script will write it to disk.
+# GCP credentials: two options
+#   Option A (Codespaces secret, recommended):
+#     Add GOOGLE_APPLICATION_CREDENTIALS_JSON as a Codespace Secret containing
+#     the full JSON of your service-account key. post-create.sh writes it to
+#     ./secrets/gcp-key.json automatically.
+#   Option B (manual):
+#     Place your key file at ./secrets/gcp-key.json before starting.
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
 
-  # ── Dev workspace ─────────────────────────────────────────────────────────
+  # ---------------------------------------------------------------------------
+  # Dev workspace
+  # NO depends_on kestra: the workspace must start immediately so Codespaces
+  # can open the editor. Kestra is a background side-service. import-flows.sh
+  # (postStartCommand) polls /api/v1/health and pushes flows once Kestra is
+  # ready, completely independently of the workspace startup sequence.
+  # ---------------------------------------------------------------------------
   workspace:
     build:
       context: .
@@ -24,23 +35,23 @@ services:
     container_name: divvy-workspace
     volumes:
       - .:/workspace:cached
-      - /var/run/docker.sock:/var/run/docker.sock   # Docker-out-of-Docker
-      - workspace-venv:/workspace/.venv              # persist pip installs
+      - /var/run/docker.sock:/var/run/docker.sock
+      - workspace-venv:/workspace/.venv
     working_dir: /workspace
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /workspace/secrets/gcp-key.json
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-my-gcp-project}
       GCP_BUCKET: ${GCP_BUCKET:-my-divvy-bucket}
       BQ_DATASET: ${BQ_DATASET:-divvy_raw}
+      GCP_LOCATION: ${GCP_LOCATION:-US}
       KESTRA_HOST: http://kestra:8080
     command: sleep infinity
-    depends_on:
-      kestra:
-        condition: service_healthy
     networks:
       - pipeline-net
 
-  # ── Kestra metadata database ─────────────────────────────────────────────
+  # ---------------------------------------------------------------------------
+  # Kestra metadata database
+  # ---------------------------------------------------------------------------
   kestra-db:
     image: postgres:15-alpine
     container_name: kestra-postgres
@@ -58,16 +69,16 @@ services:
     networks:
       - pipeline-net
 
-  # ── Kestra orchestration server ───────────────────────────────────────────
+  # ---------------------------------------------------------------------------
+  # Kestra orchestration server
+  # latest-full bundles all official plugins: GCS, BigQuery, HTTP, dbt, etc.
+  # ---------------------------------------------------------------------------
   kestra:
-    # `latest-full` image bundles all official plugins including:
-    # GCS, BigQuery, HTTP, Script (Python/Shell), dbt, and more.
     image: kestra/kestra:latest-full
     container_name: kestra
     command: server standalone --worker-thread=8
 
     environment:
-      # ── Inline Kestra configuration (overrides application.yml) ──────────
       KESTRA_CONFIGURATION: |
         datasources:
           postgres:
@@ -79,15 +90,13 @@ services:
           server:
             basic-auth:
               enabled: false
-              username: admin
-              password: admin
           repository:
             type: postgres
           storage:
             type: local
             local:
               base-path: /app/kestra-storage
-            # ── Switch to GCS for shared / production storage ────────────
+            # Uncomment to use GCS as the storage backend in production:
             # type: gcs
             # gcs:
             #   bucket: ${GCP_BUCKET}
@@ -98,25 +107,24 @@ services:
             tmp-dir:
               path: /tmp/kestra-wd/tmp
           url: http://localhost:8080/
-      # ── GCP credentials forwarded from the host / Codespace secret ───────
       GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp-key.json
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-my-gcp-project}
       GCP_BUCKET: ${GCP_BUCKET:-my-divvy-bucket}
       BQ_DATASET: ${BQ_DATASET:-divvy_raw}
 
     volumes:
-      # Flows directory — add .yml files here; they are imported at startup
+      # Flows are pushed via the REST API by import-flows.sh on each start.
+      # This bind-mount is kept as a handy reference / manual fallback.
       - ./kestra/flows:/kestra-flows:ro
-      # Persistent Kestra internal file storage
       - kestra-storage:/app/kestra-storage
-      # Temp working directory for task execution
       - kestra-tmp:/tmp/kestra-wd
-      # GCP service-account key (create ./secrets/gcp-key.json)
+      # GCP key: post-create.sh guarantees this file exists (real key or
+      # placeholder) before any service starts, so the bind never fails.
       - ./secrets/gcp-key.json:/secrets/gcp-key.json:ro
 
     ports:
-      - "8080:8080"   # Kestra UI & REST API
-      - "8081:8081"   # Kestra management endpoint
+      - "8080:8080"
+      - "8081:8081"
 
     depends_on:
       kestra-db:
@@ -127,7 +135,10 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 60s
+      # start_period gives Kestra time to initialise its DB schema and plugins
+      # before the healthcheck starts failing. latest-full is ~2 GB and slow
+      # to boot on first pull; 90 s is conservative but reliable.
+      start_period: 90s
 
     networks:
       - pipeline-net

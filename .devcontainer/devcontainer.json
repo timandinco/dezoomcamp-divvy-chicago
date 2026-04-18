@@ -5,13 +5,18 @@
   // ─────────────────────────────────────────────────────────────────────────
   "name": "Divvy ELT Pipeline",
 
-  // Use docker-compose so Kestra + Postgres start alongside the workspace
   "dockerComposeFile": "../docker-compose.yml",
   "service": "workspace",
   "workspaceFolder": "/workspace",
 
+  // initializeCommand runs on the HOST before any container starts.
+  // This guarantees ./secrets/gcp-key.json exists as a bind-mount source
+  // before Docker tries to mount it into the kestra container.
+  // Without this, Docker errors: "source path must be a directory" or
+  // silently creates a directory instead of the expected file.
+  "initializeCommand": "mkdir -p ${localWorkspaceFolder}/secrets && [ -f ${localWorkspaceFolder}/secrets/gcp-key.json ] || echo '{}' > ${localWorkspaceFolder}/secrets/gcp-key.json",
+
   // ── Port forwarding ───────────────────────────────────────────────────────
-  // Kestra UI will auto-open in the browser when the container is ready
   "forwardPorts": [8080, 8081],
   "portsAttributes": {
     "8080": {
@@ -26,8 +31,8 @@
   },
 
   // ── Lifecycle hooks ───────────────────────────────────────────────────────
-  // postCreateCommand  – runs once when the codespace is first created
-  // postStartCommand   – runs every time the codespace starts/restarts
+  // postCreateCommand  - runs once when the codespace is first created
+  // postStartCommand   - runs on every start/restart; imports flows into Kestra
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "postStartCommand": "bash scripts/import-flows.sh",
 
@@ -35,21 +40,14 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        // Python & dbt
         "ms-python.python",
         "ms-python.vscode-pylance",
         "dbt-labs.dbt-power-user",
-        // Kestra flow editor (YAML with Kestra schema support)
         "kestra-io.kestra",
-        // YAML / JSON
         "redhat.vscode-yaml",
-        // SQL
         "inferrinizzard.prettier-sql-vscode",
-        // Docker
         "ms-azuretools.vscode-docker",
-        // Git
         "eamodio.gitlens",
-        // GCP
         "googlecloudtools.cloudcode"
       ],
       "settings": {
@@ -59,7 +57,6 @@
           "editor.defaultFormatter": "redhat.vscode-yaml"
         },
         "yaml.schemas": {
-          // Kestra flow schema for auto-complete in flows/
           "https://kestra.io/defs/flow.json": "kestra/flows/**/*.yml"
         },
         "editor.formatOnSave": true,
@@ -68,13 +65,9 @@
     }
   },
 
-  // ── Environment variables available inside the workspace container ────────
-  // Sensitive values (GCP key JSON, project IDs) should be set as
-  // Codespace Secrets at: github.com → Settings → Codespaces → Secrets
   "containerEnv": {
     "KESTRA_HOST": "http://kestra:8080"
   },
 
-  // Run as the non-root vscode user provided by the base image
   "remoteUser": "vscode"
 }
