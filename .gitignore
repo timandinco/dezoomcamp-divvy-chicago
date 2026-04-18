@@ -46,7 +46,7 @@ notebooks/data/*
 gcp-credentials/*.json
 
 # Secrets / credentials 
-secrets/*
+secrets/*.json
 .env
 
 # Python 
