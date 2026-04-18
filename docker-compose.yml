@@ -3,14 +3,12 @@ version: "3.8"
 services:
   devcontainer:
     image: mcr.microsoft.com/devcontainers/python:3.11
-    volumes:
-      - ../..:/workspaces:cached
     command: sleep infinity
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/gcp/service-account.json
     volumes:
       - ../..:/workspaces:cached
-      - ./gcp-credentials:/gcp:ro
+      - ./gcp-credentials/service-account.json:/gcp/service-account.json:ro
 
   postgres:
     image: postgres:15
@@ -30,7 +28,7 @@ services:
       retries: 5
 
   kestra:
-    image: kestra/kestra:0.17.0
+    image: kestra/kestra:latest
     restart: unless-stopped
     command: server standalone
     volumes:
