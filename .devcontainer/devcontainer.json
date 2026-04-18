@@ -1,73 +1,23 @@
 {
-  // ─────────────────────────────────────────────────────────────────────────
-  // GitHub Codespaces / VS Code Dev Container configuration
-  // Pipeline: Divvy Trip Data → GCS → BigQuery (Kestra + dbt)
-  // ─────────────────────────────────────────────────────────────────────────
-  "name": "Divvy ELT Pipeline",
-
-  "dockerComposeFile": "../docker-compose.yml",
-  "service": "workspace",
-  "workspaceFolder": "/workspace",
-
-  // initializeCommand runs on the HOST before any container starts.
-  // This guarantees ./secrets/gcp-key.json exists as a bind-mount source
-  // before Docker tries to mount it into the kestra container.
-  // Without this, Docker errors: "source path must be a directory" or
-  // silently creates a directory instead of the expected file.
-  "initializeCommand": "mkdir -p ${localWorkspaceFolder}/secrets && [ -f ${localWorkspaceFolder}/secrets/gcp-key.json ] || echo '{}' > ${localWorkspaceFolder}/secrets/gcp-key.json",
-
-  // ── Port forwarding ───────────────────────────────────────────────────────
-  "forwardPorts": [8080, 8081],
-  "portsAttributes": {
-    "8080": {
-      "label": "Kestra UI",
-      "onAutoForward": "openBrowser",
-      "protocol": "http"
-    },
-    "8081": {
-      "label": "Kestra Management",
-      "onAutoForward": "silent"
-    }
+  "name": "Divvy Data Engineering",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker": "latest"
   },
 
-  // ── Lifecycle hooks ───────────────────────────────────────────────────────
-  // postCreateCommand  - runs once when the codespace is first created
-  // postStartCommand   - runs on every start/restart; imports flows into Kestra
-  "postCreateCommand": "bash .devcontainer/post-create.sh",
-  "postStartCommand": "bash scripts/import-flows.sh",
-
-  // ── VS Code extensions ────────────────────────────────────────────────────
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
-        "ms-python.vscode-pylance",
-        "dbt-labs.dbt-power-user",
-        "kestra-io.kestra",
-        "redhat.vscode-yaml",
-        "inferrinizzard.prettier-sql-vscode",
+        "ms-toolsai.jupyter",
         "ms-azuretools.vscode-docker",
-        "eamodio.gitlens",
-        "googlecloudtools.cloudcode"
-      ],
-      "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "dbt.dbtPythonPathOverride": "/usr/local/bin/python",
-        "[yaml]": {
-          "editor.defaultFormatter": "redhat.vscode-yaml"
-        },
-        "yaml.schemas": {
-          "https://kestra.io/defs/flow.json": "kestra/flows/**/*.yml"
-        },
-        "editor.formatOnSave": true,
-        "files.trimTrailingWhitespace": true
-      }
+        "redhat.vscode-yaml"
+      ]
     }
   },
-
-  "containerEnv": {
-    "KESTRA_HOST": "http://kestra:8080"
-  },
-
-  "remoteUser": "vscode"
+  
+  "forwardPorts": [8080, 8081, 8888],
+  
+  "postCreateCommand": "pip install -r requirements.txt"
 }
