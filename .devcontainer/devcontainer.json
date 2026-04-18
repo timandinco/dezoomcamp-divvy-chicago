@@ -1,15 +1,10 @@
 {
   "name": "Divvy Data Engineering",
-  "dockerComposeFile": "../docker-compose.yml",
-  "service": "kestra",
-  "workspaceFolder": "/workspace",
-
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  
   "features": {
-    "ghcr.io/devcontainers/features/python": {
-      "version": "latest"
-    }
+    "ghcr.io/devcontainers/features/docker-in-docker": "latest"
   },
-
 
   "customizations": {
     "vscode": {
@@ -22,15 +17,7 @@
     }
   },
   
-  "forwardPorts": [8080, 8081],
-  "portsAttributes": {
-    "8080": {
-      "label": "Kestra UI",
-      "onAutoForward": "notify"
-    }
-  },
+  "forwardPorts": [8080, 8081, 8888],
   
-  "postCreateCommand": "pip install -r requirements.txt",
-  
-  "remoteUser": "root"
+  "postCreateCommand": "pip install -r requirements.txt"
 }

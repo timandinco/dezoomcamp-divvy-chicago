@@ -10,6 +10,8 @@ services:
       POSTGRES_PASSWORD: k3str4
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kestra"]
       interval: 10s
@@ -25,9 +27,7 @@ services:
     volumes:
       - kestra-data:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./kestra/flows:/app/flows  # Your flows directory
-      - ./data:/app/data           # For downloaded files
-      - ./gcp-credentials:/app/gcp-credentials  # GCP service account
+      - .:/workspace  # Mount current directory
     environment:
       KESTRA_CONFIGURATION: |
         datasources:
@@ -46,9 +46,6 @@ services:
             type: local
             local:
               base-path: "/app/storage"
-          flows:
-            paths:
-              - "/kestra/flows"
           queue:
             type: postgres
           tasks:
